@@ -1,0 +1,86 @@
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 246, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2066, in __call__
+    def __call__(self, *args):
+    
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2066, in __call__
+    def __call__(self, *args):
+    
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2066, in __call__
+    def __call__(self, *args):
+    
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2066, in __call__
+    def __call__(self, *args):
+    
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2066, in __call__
+    def __call__(self, *args):
+    
+KeyboardInterrupt
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411
+    volume_percent = int(float(value))
+    ^^^^^^^^^^^^^^
+IndentationError: expected an indented block after function definition on line 410
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411
+    volume_percent = int(float(value))
+    ^^^^^^^^^^^^^^
+IndentationError: expected an indented block after function definition on line 410
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 411
+    volume_percent = int(float(value))
+    ^^^^^^^^^^^^^^
+IndentationError: expected an indented block after function definition on line 410
+Traceback (most recent call last):
+  File "/home/skynet/LaserLyre/GUI/lyre_gui.py", line 621, in <module>
+    root.mainloop()
+    ~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 1602, in mainloop
+    self.tk.mainloop(n)
+    ~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2066, in __call__
+    def __call__(self, *args):
+    
+KeyboardInterrupt
