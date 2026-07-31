@@ -28,6 +28,19 @@ class LaserLyreGUI:
             72: 7,
         }
 
+        #major keys
+        self.key_offsets = {
+                "C": 0,
+                "D": 2,
+                }
+
+        self.scale = [0,2,4,5,7,9,11,12]
+
+        #key and octave setings
+        self.current_key = "C"
+        self.current_octave = 0
+
+
         # General MIDI program numbers.
         self.instrument_programs = {
             "Grand Piano": 0,
@@ -43,6 +56,9 @@ class LaserLyreGUI:
         self.beam_states = [False] * 8
         self.beam_buttons = []
 
+        
+
+
         # Calibration state.
         self.calibration_active = False
         self.calibration_beam = 0
@@ -55,6 +71,8 @@ class LaserLyreGUI:
         # GUI variables.
         self.instrument_var = tk.StringVar(value="Grand Piano")
         self.volume_var = tk.IntVar(value=80)
+        self.key_var = tk.StringVar(value ="C")
+        self.octave_var = tk.IntVar(value = 0)
         self.status_var = tk.StringVar(
             value="Starting MIDI connections..."
         )
@@ -64,10 +82,22 @@ class LaserLyreGUI:
         self.create_controls()
         self.create_status_bar()
 
+        self.update_midi_mapping()
         self.connect_to_pico()
         self.connect_to_fluidsynth()
 
         self.root.after(10, self.check_midi)
+
+    def update_midi_mapping(self):
+        key_offset = self.key_offsets[self.current_key]
+        octave_shift = self.current_octave * 12
+        base_midi = 60 + key_offset + octave_shift
+
+        self.midi_note_to_beam = {}
+
+        for beam_index, interval in enumerate(self.scale):
+            midi_note = base_midi + interval
+            self.midi_note_to_beam[midi_note] = beam_index
 
     def create_header(self):
         header = tk.Frame(
@@ -231,6 +261,114 @@ class LaserLyreGUI:
             pady=8
         )
 
+        #key selection
+        key_label =tk.Label(
+            controls,
+            text ="Key",
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937"
+        )
+
+        key_label.grid(
+            row=0,
+            column=4,
+            padx=(30,10),
+            pady=18
+        )
+
+        key_menu = ttk.Combobox(
+            controls, 
+            textvariable=self.key_var,
+            values=list(self.key_offsets.keys()),
+            state="readonly",
+            font=("Arial", 14),
+            width =3
+        )
+
+        key_menu.grid(
+            row=0,
+            column=5,
+            padx=5,
+            pady=18
+        )
+
+        key_menu.bind(
+            "<<ComboboxSelected>>",
+            self.key_changed
+        )
+
+        #octave controls
+        octave_label = tk.Label(
+            controls,
+            text="Octave:",
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937"
+        )
+
+        octave_label.grid(
+            row=0,column=6,
+            padx=(15,10),
+            pady=18
+        )
+
+        octave_down_button = tk.Button(
+            controls, 
+            text = "-",
+            font=("Arial", 15, "bold"),
+            bg="#1f2937",
+            fg="#1f2937",
+            activebackground="#4b5563",
+            activeforeground="white",
+            command=self.octave_down,
+            width=3
+        )
+
+        octave_down_button.grid(
+            row=0, 
+            column=7,
+            padx=2,
+            pady=18
+        )
+
+        octave_display = tk.Label(
+            controls,
+            textvariable=self.octave_var,
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937",
+            width=2
+        )
+
+        octave_display.grid(
+            row=0,
+            column=8,
+            padx=5,
+            pady=18,
+
+        )
+
+        octave_up_button = tk.Button(
+            controls, 
+            text = "+",
+            font=("Arial", 15, "bold"),
+            bg="#1f2937",
+            fg="#1f2937",
+            activebackground="#4b5563",
+            activeforeground="white",
+            command=self.octave_up,
+            width=3
+        )
+
+        octave_up_button.grid(
+            row=0,
+            column=9,
+            padx=2,
+            pady=18
+        )
+
+        #calibration
         calibration_button = tk.Button(
             controls,
             text="Calibrate",
@@ -244,7 +382,7 @@ class LaserLyreGUI:
         )
         calibration_button.grid(
             row=0,
-            column=4,
+            column=10,
             padx=20,
             pady=18
         )
@@ -263,6 +401,31 @@ class LaserLyreGUI:
             pady=10
         )
         status_bar.pack(fill="x", side="bottom")
+
+    def key_changed(self, event=None):
+        self.current_key = self.key_var.get()
+        self.update_midi_mapping()
+        self.status_var.set(f"Key changed to: {self.current_key} major")
+
+    def octave_down(self):
+        if self.current_octave > -1:
+            self.current_octave -= 1
+            self.octave_var.set(self.current_octave)
+            self.update_midi_mapping()
+            octave_name = self.get_octave_name()
+            self.status_var.set(f"shifted {octave_name}")
+
+    def octave_up(self):
+            if self.current_octave < 1:
+                self.current_octave += 1
+                self.octave_var.set(self.current_octave)
+                self.update_midi_mapping()
+                octave_name = self.get_octave_name()
+                self.status_var.set(f"shifted {octave_name}")
+
+    def get_octave_name(self):
+        octave_names = {-1:"1 octave down", 0: "to default octave", 1:"1 octave up"}
+        return octave_names.get(self.current_octave, "unknown")
 
     def connect_to_pico(self):
         try:
