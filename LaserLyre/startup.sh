@@ -9,7 +9,7 @@ mkdir -p "$LOG_DIR"
 echo "========================================" > "$LOG_DIR/startup.log"
 echo "Laser Lyre startup began: $(date)" >> "$LOG_DIR/startup.log"
 
-# Allow the desktop, audio system, and Pico time to initialize.
+# Allow the desktop and audio system time to initialize.
 sleep 5
 
 # Stop any older FluidSynth process.
@@ -44,39 +44,6 @@ FLUID_PID=$!
 
 echo "FluidSynth started with PID $FLUID_PID" \
     >> "$LOG_DIR/startup.log"
-
-# Wait until both the Pico and FluidSynth MIDI ports appear.
-CONNECTED=false
-
-for attempt in $(seq 1 30); do
-    echo "Connection attempt $attempt" \
-        >> "$LOG_DIR/startup.log"
-
-    if aconnect -i | grep -q "Pico W" &&
-       aconnect -o | grep -q "FLUID Synth"; then
-
-        aconnect "Pico W":0 "FLUID Synth":0 \
-            >> "$LOG_DIR/startup.log" 2>&1
-
-        if [ $? -eq 0 ]; then
-            echo "Pico connected to FluidSynth" \
-                >> "$LOG_DIR/startup.log"
-
-            CONNECTED=true
-            break
-        fi
-    fi
-
-    sleep 1
-done
-
-if [ "$CONNECTED" = false ]; then
-    echo "ERROR: Could not connect Pico to FluidSynth" \
-        >> "$LOG_DIR/startup.log"
-else
-    echo "Laser Lyre audio is ready" \
-        >> "$LOG_DIR/startup.log"
-fi
 
 # Launch the GUI.
 echo "Launching GUI" >> "$LOG_DIR/startup.log"

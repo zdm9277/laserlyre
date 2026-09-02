@@ -13,10 +13,15 @@ class LaserLyreGUI:
         self.root.bind("<Escape>", self.exit_fullscreen)
         self.root.protocol("WM_DELETE_WINDOW", self.close_program)
 
-        # Notes used by the eight laser strings.
+        # Base notes used by the eight laser strings.
         self.notes = ["C", "D", "E", "F", "G", "A", "B", "C"]
 
-        # MIDI note numbers sent by the Pico.
+        # Original MIDI notes sent by the Pico.
+        self.base_midi_notes = [
+            60, 62, 64, 65, 67, 69, 71, 72
+        ]
+
+        # MIDI note numbers sent by the Pico mapped to beam numbers.
         self.midi_note_to_beam = {
             60: 0,
             62: 1,
@@ -26,6 +31,38 @@ class LaserLyreGUI:
             69: 5,
             71: 6,
             72: 7,
+        }
+
+        # Note names for displaying transposed notes.
+        self.note_names = [
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+            "A",
+            "A#",
+            "B",
+        ]
+
+        # Key offsets from C in semitones.
+        self.key_offsets = {
+            "C": 0,
+            "C#": 1,
+            "D": 2,
+            "D#": 3,
+            "E": 4,
+            "F": 5,
+            "F#": 6,
+            "G": 7,
+            "G#": 8,
+            "A": 9,
+            "A#": 10,
+            "B": 11,
         }
 
         # General MIDI program numbers.
@@ -40,8 +77,16 @@ class LaserLyreGUI:
             "Synth Lead": 80,
         }
 
+        # Beam state.
         self.beam_states = [False] * 8
         self.beam_buttons = []
+
+        # Note timers.
+        self.note_off_timers = [None] * 8
+
+        # Keep track of the actual transposed MIDI note being played
+        # by each beam.
+        self.active_output_notes = [None] * 8
 
         # Calibration state.
         self.calibration_active = False
@@ -53,21 +98,54 @@ class LaserLyreGUI:
         self.midi_output = None
 
         # GUI variables.
-        self.instrument_var = tk.StringVar(value="Grand Piano")
-        self.volume_var = tk.IntVar(value=80)
+        self.instrument_var = tk.StringVar(
+            value="Grand Piano"
+        )
+
+        self.volume_var = tk.IntVar(
+            value=80
+        )
+
+        self.key_var = tk.StringVar(
+            value="C"
+        )
+
+        self.octave_var = tk.IntVar(
+            value=0
+        )
+
+        self.octave_text = tk.StringVar(
+            value="0"
+        )
+
+        self.note_duration_var = tk.DoubleVar(
+            value=2.0
+        )
+
+        self.note_duration_text = tk.StringVar(
+            value="2.00 s"
+        )
+
         self.status_var = tk.StringVar(
             value="Starting MIDI connections..."
         )
 
+        # Build GUI.
         self.create_header()
         self.create_beam_section()
         self.create_controls()
         self.create_status_bar()
 
+        # Connect MIDI devices.
         self.connect_to_pico()
         self.connect_to_fluidsynth()
 
+        # Continuously check Pico MIDI input.
         self.root.after(10, self.check_midi)
+
+    # ============================================================
+    # GUI
+    # ============================================================
 
     def create_header(self):
         header = tk.Frame(
@@ -75,7 +153,10 @@ class LaserLyreGUI:
             bg="#0f172a",
             height=80
         )
-        header.pack(fill="x")
+
+        header.pack(
+            fill="x"
+        )
 
         title = tk.Label(
             header,
@@ -84,7 +165,12 @@ class LaserLyreGUI:
             fg="white",
             bg="#0f172a"
         )
-        title.pack(side="left", padx=25, pady=18)
+
+        title.pack(
+            side="left",
+            padx=25,
+            pady=18
+        )
 
         exit_button = tk.Button(
             header,
@@ -97,13 +183,19 @@ class LaserLyreGUI:
             command=self.close_program,
             width=8
         )
-        exit_button.pack(side="right", padx=25, pady=18)
+
+        exit_button.pack(
+            side="right",
+            padx=25,
+            pady=18
+        )
 
     def create_beam_section(self):
         beam_frame = tk.Frame(
             self.root,
             bg="#111827"
         )
+
         beam_frame.pack(
             fill="both",
             expand=True,
@@ -118,18 +210,27 @@ class LaserLyreGUI:
             fg="white",
             bg="#111827"
         )
-        beam_title.pack(pady=(0, 15))
+
+        beam_title.pack(
+            pady=(0, 15)
+        )
 
         button_frame = tk.Frame(
             beam_frame,
             bg="#111827"
         )
-        button_frame.pack(expand=True)
+
+        button_frame.pack(
+            expand=True
+        )
 
         for index in range(8):
             button = tk.Button(
                 button_frame,
-                text=f"Beam {index + 1}\n{self.notes[index]}",
+                text=(
+                    f"Beam {index + 1}\n"
+                    f"{self.get_beam_note_name(index)}"
+                ),
                 width=8,
                 height=5,
                 font=("Arial", 14, "bold"),
@@ -137,7 +238,8 @@ class LaserLyreGUI:
                 fg="white",
                 activebackground="#2563eb",
                 activeforeground="white",
-                command=lambda i=index: self.manual_beam_test(i)
+                command=lambda i=index:
+                    self.manual_beam_test(i)
             )
 
             button.grid(
@@ -149,18 +251,27 @@ class LaserLyreGUI:
             )
 
             self.beam_buttons.append(button)
-            button_frame.grid_columnconfigure(index, weight=1)
+
+            button_frame.grid_columnconfigure(
+                index,
+                weight=1
+            )
 
     def create_controls(self):
         controls = tk.Frame(
             self.root,
             bg="#1f2937"
         )
+
         controls.pack(
             fill="x",
             padx=20,
             pady=(0, 20)
         )
+
+        # --------------------------------------------------------
+        # Instrument
+        # --------------------------------------------------------
 
         instrument_label = tk.Label(
             controls,
@@ -169,25 +280,29 @@ class LaserLyreGUI:
             fg="white",
             bg="#1f2937"
         )
+
         instrument_label.grid(
             row=0,
             column=0,
-            padx=15,
+            padx=(15, 5),
             pady=18
         )
 
         instrument_menu = ttk.Combobox(
             controls,
             textvariable=self.instrument_var,
-            values=list(self.instrument_programs.keys()),
+            values=list(
+                self.instrument_programs.keys()
+            ),
             state="readonly",
             font=("Arial", 14),
-            width=20
+            width=17
         )
+
         instrument_menu.grid(
             row=0,
             column=1,
-            padx=10,
+            padx=5,
             pady=18
         )
 
@@ -196,6 +311,10 @@ class LaserLyreGUI:
             self.instrument_changed
         )
 
+        # --------------------------------------------------------
+        # Volume
+        # --------------------------------------------------------
+
         volume_label = tk.Label(
             controls,
             text="Volume:",
@@ -203,10 +322,11 @@ class LaserLyreGUI:
             fg="white",
             bg="#1f2937"
         )
+
         volume_label.grid(
             row=0,
             column=2,
-            padx=(30, 10),
+            padx=(20, 5),
             pady=18
         )
 
@@ -217,19 +337,131 @@ class LaserLyreGUI:
             orient="horizontal",
             variable=self.volume_var,
             command=self.volume_changed,
-            length=250,
+            length=200,
             font=("Arial", 12),
             bg="#1f2937",
             fg="white",
             troughcolor="#374151",
             highlightthickness=0
         )
+
         volume_slider.grid(
             row=0,
             column=3,
-            padx=10,
+            padx=5,
             pady=8
         )
+
+        # --------------------------------------------------------
+        # Key
+        # --------------------------------------------------------
+
+        key_label = tk.Label(
+            controls,
+            text="Key:",
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937"
+        )
+
+        key_label.grid(
+            row=0,
+            column=4,
+            padx=(20, 5),
+            pady=18
+        )
+
+        key_menu = ttk.Combobox(
+            controls,
+            textvariable=self.key_var,
+            values=list(
+                self.key_offsets.keys()
+            ),
+            state="readonly",
+            font=("Arial", 14),
+            width=4
+        )
+
+        key_menu.grid(
+            row=0,
+            column=5,
+            padx=5,
+            pady=18
+        )
+
+        key_menu.bind(
+            "<<ComboboxSelected>>",
+            self.key_changed
+        )
+
+        # --------------------------------------------------------
+        # Octave
+        # --------------------------------------------------------
+
+        octave_label = tk.Label(
+            controls,
+            text="Octave:",
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937"
+        )
+
+        octave_label.grid(
+            row=0,
+            column=6,
+            padx=(20, 5),
+            pady=18
+        )
+
+        octave_down_button = tk.Button(
+            controls,
+            text="-",
+            font=("Arial", 14, "bold"),
+            command=self.octave_down,
+            width=3
+        )
+
+        octave_down_button.grid(
+            row=0,
+            column=7,
+            padx=4,
+            pady=18
+        )
+
+        octave_value = tk.Label(
+            controls,
+            textvariable=self.octave_text,
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937",
+            width=3
+        )
+
+        octave_value.grid(
+            row=0,
+            column=8,
+            padx=2,
+            pady=18
+        )
+
+        octave_up_button = tk.Button(
+            controls,
+            text="+",
+            font=("Arial", 14, "bold"),
+            command=self.octave_up,
+            width=3
+        )
+
+        octave_up_button.grid(
+            row=0,
+            column=9,
+            padx=4,
+            pady=18
+        )
+
+        # --------------------------------------------------------
+        # Calibrate
+        # --------------------------------------------------------
 
         calibration_button = tk.Button(
             controls,
@@ -242,14 +474,80 @@ class LaserLyreGUI:
             command=self.calibrate,
             width=11
         )
+
         calibration_button.grid(
             row=0,
-            column=4,
+            column=10,
             padx=20,
             pady=18
         )
 
-        controls.grid_columnconfigure(3, weight=1)
+        # --------------------------------------------------------
+        # Note duration
+        # --------------------------------------------------------
+
+        duration_label = tk.Label(
+            controls,
+            text="Note Duration:",
+            font=("Arial", 15, "bold"),
+            fg="white",
+            bg="#1f2937"
+        )
+
+        duration_label.grid(
+            row=1,
+            column=0,
+            padx=15,
+            pady=(0, 12)
+        )
+
+        duration_slider = tk.Scale(
+            controls,
+            from_=0.25,
+            to=5.0,
+            resolution=0.25,
+            orient="horizontal",
+            variable=self.note_duration_var,
+            command=self.note_duration_changed,
+            length=500,
+            font=("Arial", 12),
+            bg="#1f2937",
+            fg="white",
+            troughcolor="#374151",
+            highlightthickness=0,
+            showvalue=False
+        )
+
+        duration_slider.grid(
+            row=1,
+            column=1,
+            columnspan=7,
+            padx=10,
+            pady=(0, 12),
+            sticky="ew"
+        )
+
+        duration_value_label = tk.Label(
+            controls,
+            textvariable=self.note_duration_text,
+            font=("Arial", 15, "bold"),
+            fg="#86efac",
+            bg="#1f2937",
+            width=7
+        )
+
+        duration_value_label.grid(
+            row=1,
+            column=8,
+            columnspan=2,
+            padx=10,
+            pady=(0, 12)
+        )
+
+        controls.grid_columnconfigure(
+            3,
+            weight=1
+        )
 
     def create_status_bar(self):
         status_bar = tk.Label(
@@ -262,10 +560,22 @@ class LaserLyreGUI:
             padx=20,
             pady=10
         )
-        status_bar.pack(fill="x", side="bottom")
+
+        status_bar.pack(
+            fill="x",
+            side="bottom"
+        )
+
+    # ============================================================
+    # MIDI CONNECTIONS
+    # ============================================================
 
     def connect_to_pico(self):
         try:
+            # Do not open another connection if one already exists.
+            if self.midi_input is not None:
+                return
+
             pico_port_name = None
 
             for port_name in mido.get_input_names():
@@ -280,10 +590,17 @@ class LaserLyreGUI:
                 self.status_var.set(
                     "Pico MIDI not found. Retrying..."
                 )
-                self.root.after(2000, self.connect_to_pico)
+
+                self.root.after(
+                    2000,
+                    self.connect_to_pico
+                )
+
                 return
 
-            self.midi_input = mido.open_input(pico_port_name)
+            self.midi_input = mido.open_input(
+                pico_port_name
+            )
 
             self.status_var.set(
                 f"Pico connected: {pico_port_name}"
@@ -296,10 +613,17 @@ class LaserLyreGUI:
                 f"Pico connection error: {error}"
             )
 
-            self.root.after(2000, self.connect_to_pico)
+            self.root.after(
+                2000,
+                self.connect_to_pico
+            )
 
     def connect_to_fluidsynth(self):
         try:
+            # Do not open another connection if one already exists.
+            if self.midi_output is not None:
+                return
+
             fluid_port_name = None
 
             for port_name in mido.get_output_names():
@@ -309,24 +633,34 @@ class LaserLyreGUI:
 
             if fluid_port_name is None:
                 self.status_var.set(
-                    "FluidSynth MIDI output not found. Retrying..."
+                    "FluidSynth MIDI output not found. "
+                    "Retrying..."
                 )
+
                 self.root.after(
                     2000,
                     self.connect_to_fluidsynth
                 )
+
                 return
 
             self.midi_output = mido.open_output(
                 fluid_port_name
             )
 
-            # Apply the default instrument and volume.
+            # Apply default instrument.
             self.send_program_change()
-            self.volume_changed(self.volume_var.get())
+
+            # Apply default volume.
+            self.volume_changed(
+                self.volume_var.get()
+            )
 
             self.status_var.set(
-                f"Ready — {self.instrument_var.get()}"
+                f"Ready — "
+                f"{self.instrument_var.get()} — "
+                f"Key {self.key_var.get()} — "
+                f"Octave {self.octave_text.get()}"
             )
 
         except Exception as error:
@@ -359,9 +693,20 @@ class LaserLyreGUI:
                 pass
 
             self.midi_input = None
-            self.root.after(2000, self.connect_to_pico)
 
-        self.root.after(10, self.check_midi)
+            self.root.after(
+                2000,
+                self.connect_to_pico
+            )
+
+        self.root.after(
+            10,
+            self.check_midi
+        )
+
+    # ============================================================
+    # MIDI NOTE HANDLING
+    # ============================================================
 
     def handle_midi_message(self, message):
         if not hasattr(message, "note"):
@@ -370,33 +715,380 @@ class LaserLyreGUI:
         if message.note not in self.midi_note_to_beam:
             return
 
-        beam_index = self.midi_note_to_beam[message.note]
+        beam_index = self.midi_note_to_beam[
+            message.note
+        ]
+
+        # --------------------------------------------------------
+        # Calibration mode
+        # --------------------------------------------------------
 
         if self.calibration_active:
-            # During calibration, only beam breaks matter.
-            # Note-off messages are ignored so PASSED beams stay green.
             if (
                 message.type == "note_on"
                 and message.velocity > 0
             ):
-                self.handle_calibration_note(beam_index)
+                self.handle_calibration_note(
+                    beam_index
+                )
 
             return
+
+        # --------------------------------------------------------
+        # Beam broken / Note ON
+        # --------------------------------------------------------
 
         if (
             message.type == "note_on"
             and message.velocity > 0
         ):
-            self.set_beam_active(beam_index)
+            # Cancel an old timer if this beam is triggered again.
+            self.cancel_note_off_timer(
+                beam_index
+            )
 
-        elif message.type == "note_off":
-            self.set_beam_inactive(beam_index)
+            # Stop any older note still assigned to this beam.
+            self.stop_output_note(
+                beam_index
+            )
+
+            # Apply key and octave transposition.
+            output_note = self.transpose_note(
+                message.note
+            )
+
+            # Send the transformed note to FluidSynth.
+            if self.midi_output is not None:
+                try:
+                    self.midi_output.send(
+                        mido.Message(
+                            "note_on",
+                            channel=0,
+                            note=output_note,
+                            velocity=message.velocity
+                        )
+                    )
+
+                    self.active_output_notes[
+                        beam_index
+                    ] = output_note
+
+                except Exception as error:
+                    self.status_var.set(
+                        f"MIDI output error: {error}"
+                    )
+
+                    return
+
+            # Update GUI.
+            self.set_beam_active(
+                beam_index
+            )
+
+            # Start maximum note-duration timer.
+            self.schedule_note_off(
+                beam_index,
+                output_note
+            )
+
+        # --------------------------------------------------------
+        # Beam restored / Note OFF
+        # --------------------------------------------------------
 
         elif (
-            message.type == "note_on"
-            and message.velocity == 0
+            message.type == "note_off"
+            or (
+                message.type == "note_on"
+                and message.velocity == 0
+            )
         ):
-            self.set_beam_inactive(beam_index)
+            self.cancel_note_off_timer(
+                beam_index
+            )
+
+            self.stop_output_note(
+                beam_index
+            )
+
+            self.set_beam_inactive(
+                beam_index
+            )
+
+    # ============================================================
+    # NOTE TRANSFORMATION
+    # ============================================================
+
+    def get_transpose_amount(self):
+        key_shift = self.key_offsets[
+            self.key_var.get()
+        ]
+
+        octave_shift = (
+            self.octave_var.get() * 12
+        )
+
+        return (
+            key_shift
+            + octave_shift
+        )
+
+    def transpose_note(self, midi_note):
+        new_note = (
+            midi_note
+            + self.get_transpose_amount()
+        )
+
+        # Valid MIDI note range is 0 through 127.
+        return max(
+            0,
+            min(127, new_note)
+        )
+
+    def get_note_name(self, midi_note):
+        note_name = self.note_names[
+            midi_note % 12
+        ]
+
+        octave_number = (
+            midi_note // 12
+        ) - 1
+
+        return (
+            f"{note_name}"
+            f"{octave_number}"
+        )
+
+    def get_beam_note_name(self, index):
+        midi_note = self.transpose_note(
+            self.base_midi_notes[index]
+        )
+
+        return self.get_note_name(
+            midi_note
+        )
+
+    def refresh_beam_labels(self):
+        if self.calibration_active:
+            return
+
+        for index in range(8):
+            if not self.beam_states[index]:
+                self.beam_buttons[index].configure(
+                    text=(
+                        f"Beam {index + 1}\n"
+                        f"{self.get_beam_note_name(index)}"
+                    )
+                )
+
+    # ============================================================
+    # KEY CONTROL
+    # ============================================================
+
+    def key_changed(self, event=None):
+        # Stop notes before changing the musical configuration.
+        self.stop_all_active_notes()
+
+        self.refresh_beam_labels()
+
+        self.status_var.set(
+            f"Key changed to "
+            f"{self.key_var.get()}"
+        )
+
+    # ============================================================
+    # OCTAVE CONTROL
+    # ============================================================
+
+    def octave_down(self):
+        new_octave = (
+            self.octave_var.get() - 1
+        )
+
+        # Limit octave shifting.
+        if new_octave < -3:
+            self.status_var.set(
+                "Minimum octave reached"
+            )
+            return
+
+        self.stop_all_active_notes()
+
+        self.octave_var.set(
+            new_octave
+        )
+
+        self.update_octave_text()
+
+        self.refresh_beam_labels()
+
+        self.status_var.set(
+            f"Octave changed to "
+            f"{self.octave_text.get()}"
+        )
+
+    def octave_up(self):
+        new_octave = (
+            self.octave_var.get() + 1
+        )
+
+        # Limit octave shifting.
+        if new_octave > 3:
+            self.status_var.set(
+                "Maximum octave reached"
+            )
+            return
+
+        self.stop_all_active_notes()
+
+        self.octave_var.set(
+            new_octave
+        )
+
+        self.update_octave_text()
+
+        self.refresh_beam_labels()
+
+        self.status_var.set(
+            f"Octave changed to "
+            f"{self.octave_text.get()}"
+        )
+
+    def update_octave_text(self):
+        octave = self.octave_var.get()
+
+        if octave > 0:
+            self.octave_text.set(
+                f"+{octave}"
+            )
+        else:
+            self.octave_text.set(
+                str(octave)
+            )
+
+    # ============================================================
+    # NOTE TIMERS
+    # ============================================================
+
+    def schedule_note_off(
+        self,
+        beam_index,
+        midi_note
+    ):
+        self.cancel_note_off_timer(
+            beam_index
+        )
+
+        duration_ms = max(
+            1,
+            int(
+                self.note_duration_var.get()
+                * 1000
+            )
+        )
+
+        self.note_off_timers[
+            beam_index
+        ] = self.root.after(
+            duration_ms,
+            lambda i=beam_index, n=midi_note:
+                self.stop_note_after_duration(
+                    i,
+                    n
+                )
+        )
+
+    def cancel_note_off_timer(
+        self,
+        beam_index
+    ):
+        timer_id = self.note_off_timers[
+            beam_index
+        ]
+
+        if timer_id is not None:
+            try:
+                self.root.after_cancel(
+                    timer_id
+                )
+            except Exception:
+                pass
+
+            self.note_off_timers[
+                beam_index
+            ] = None
+
+    def stop_note_after_duration(
+        self,
+        beam_index,
+        midi_note
+    ):
+        self.note_off_timers[
+            beam_index
+        ] = None
+
+        self.stop_output_note(
+            beam_index
+        )
+
+        self.set_beam_inactive(
+            beam_index
+        )
+
+        self.status_var.set(
+            f"Beam {beam_index + 1} stopped after "
+            f"{self.note_duration_var.get():.2f} seconds"
+        )
+
+    def stop_output_note(
+        self,
+        beam_index
+    ):
+        note = self.active_output_notes[
+            beam_index
+        ]
+
+        if note is None:
+            return
+
+        if self.midi_output is not None:
+            try:
+                self.midi_output.send(
+                    mido.Message(
+                        "note_off",
+                        channel=0,
+                        note=note,
+                        velocity=0
+                    )
+                )
+
+            except Exception as error:
+                self.status_var.set(
+                    f"Note-off error: {error}"
+                )
+
+        self.active_output_notes[
+            beam_index
+        ] = None
+
+    def stop_all_active_notes(self):
+        for index in range(8):
+            self.cancel_note_off_timer(
+                index
+            )
+
+            self.stop_output_note(
+                index
+            )
+
+            self.beam_states[
+                index
+            ] = False
+
+        self.refresh_beam_labels()
+
+    # ============================================================
+    # BEAM DISPLAY
+    # ============================================================
 
     def set_beam_active(self, index):
         self.beam_states[index] = True
@@ -404,12 +1096,15 @@ class LaserLyreGUI:
         self.beam_buttons[index].configure(
             bg="#22c55e",
             activebackground="#16a34a",
-            text=f"Beam {index + 1}\nACTIVE"
+            text=(
+                f"Beam {index + 1}\n"
+                f"ACTIVE"
+            )
         )
 
         self.status_var.set(
             f"Beam {index + 1} broken — "
-            f"{self.notes[index]} playing"
+            f"{self.get_beam_note_name(index)} playing"
         )
 
     def set_beam_inactive(self, index):
@@ -418,28 +1113,86 @@ class LaserLyreGUI:
         self.beam_buttons[index].configure(
             bg="#1f2937",
             activebackground="#2563eb",
-            text=f"Beam {index + 1}\n{self.notes[index]}"
+            text=(
+                f"Beam {index + 1}\n"
+                f"{self.get_beam_note_name(index)}"
+            )
         )
 
         self.status_var.set(
             f"Beam {index + 1} restored"
         )
 
+    # ============================================================
+    # MANUAL BEAM TEST
+    # ============================================================
+
     def manual_beam_test(self, index):
         if self.calibration_active:
             return
 
         if self.beam_states[index]:
-            self.set_beam_inactive(index)
+            self.cancel_note_off_timer(
+                index
+            )
+
+            self.stop_output_note(
+                index
+            )
+
+            self.set_beam_inactive(
+                index
+            )
+
         else:
-            self.set_beam_active(index)
+            output_note = self.transpose_note(
+                self.base_midi_notes[index]
+            )
+
+            if self.midi_output is not None:
+                try:
+                    self.midi_output.send(
+                        mido.Message(
+                            "note_on",
+                            channel=0,
+                            note=output_note,
+                            velocity=127
+                        )
+                    )
+
+                    self.active_output_notes[
+                        index
+                    ] = output_note
+
+                except Exception as error:
+                    self.status_var.set(
+                        f"Manual MIDI test failed: {error}"
+                    )
+
+                    return
+
+            self.set_beam_active(
+                index
+            )
+
+            self.schedule_note_off(
+                index,
+                output_note
+            )
+
+    # ============================================================
+    # INSTRUMENT CONTROL
+    # ============================================================
 
     def send_program_change(self):
         if self.midi_output is None:
             return
 
         instrument = self.instrument_var.get()
-        program_number = self.instrument_programs[instrument]
+
+        program_number = self.instrument_programs[
+            instrument
+        ]
 
         message = mido.Message(
             "program_change",
@@ -447,7 +1200,9 @@ class LaserLyreGUI:
             program=program_number
         )
 
-        self.midi_output.send(message)
+        self.midi_output.send(
+            message
+        )
 
     def instrument_changed(self, event=None):
         try:
@@ -455,7 +1210,11 @@ class LaserLyreGUI:
                 self.status_var.set(
                     "FluidSynth is not connected"
                 )
+
                 return
+
+            # Stop currently playing notes before changing instrument.
+            self.stop_all_active_notes()
 
             self.send_program_change()
 
@@ -469,15 +1228,22 @@ class LaserLyreGUI:
                 f"Instrument change failed: {error}"
             )
 
+    # ============================================================
+    # VOLUME CONTROL
+    # ============================================================
+
     def volume_changed(self, value):
-        volume_percent = int(float(value))
+        volume_percent = int(
+            float(value)
+        )
 
         if self.midi_output is None:
             return
 
-        # MIDI volume ranges from 0 through 127.
+        # MIDI volume range is 0 through 127.
         midi_volume = int(
-            (volume_percent / 100) * 127
+            (volume_percent / 100)
+            * 127
         )
 
         try:
@@ -488,10 +1254,13 @@ class LaserLyreGUI:
                 value=midi_volume
             )
 
-            self.midi_output.send(message)
+            self.midi_output.send(
+                message
+            )
 
             self.status_var.set(
-                f"Volume: {volume_percent}%"
+                f"Volume: "
+                f"{volume_percent}%"
             )
 
         except Exception as error:
@@ -499,18 +1268,53 @@ class LaserLyreGUI:
                 f"Volume change failed: {error}"
             )
 
+    # ============================================================
+    # NOTE DURATION
+    # ============================================================
+
+    def note_duration_changed(self, value):
+        duration = float(value)
+
+        self.note_duration_text.set(
+            f"{duration:.2f} s"
+        )
+
+        self.status_var.set(
+            f"Note duration: "
+            f"{duration:.2f} seconds"
+        )
+
+    # ============================================================
+    # CALIBRATION
+    # ============================================================
+
     def calibrate(self):
+        # Stop any notes that are currently playing.
+        self.stop_all_active_notes()
+
         self.calibration_active = True
         self.calibration_beam = 0
-        self.calibration_passed = [False] * 8
+
+        self.calibration_passed = [
+            False
+        ] * 8
 
         for index in range(8):
-            self.beam_states[index] = False
+            self.cancel_note_off_timer(
+                index
+            )
+
+            self.beam_states[
+                index
+            ] = False
 
             self.beam_buttons[index].configure(
                 bg="#1f2937",
                 activebackground="#2563eb",
-                text=f"Beam {index + 1}\n{self.notes[index]}"
+                text=(
+                    f"Beam {index + 1}\n"
+                    f"{self.get_beam_note_name(index)}"
+                )
             )
 
         self.highlight_calibration_beam()
@@ -525,81 +1329,148 @@ class LaserLyreGUI:
                 self.beam_buttons[index].configure(
                     bg="#22c55e",
                     activebackground="#16a34a",
-                    text=f"Beam {index + 1}\nPASSED"
+                    text=(
+                        f"Beam {index + 1}\n"
+                        f"PASSED"
+                    )
                 )
 
             elif index == self.calibration_beam:
                 self.beam_buttons[index].configure(
                     bg="#f59e0b",
                     activebackground="#d97706",
-                    text=f"Beam {index + 1}\nTEST"
+                    text=(
+                        f"Beam {index + 1}\n"
+                        f"TEST"
+                    )
                 )
 
             else:
                 self.beam_buttons[index].configure(
                     bg="#1f2937",
                     activebackground="#2563eb",
-                    text=f"Beam {index + 1}\n{self.notes[index]}"
+                    text=(
+                        f"Beam {index + 1}\n"
+                        f"{self.get_beam_note_name(index)}"
+                    )
                 )
 
-    def handle_calibration_note(self, beam_index):
+    def handle_calibration_note(
+        self,
+        beam_index
+    ):
         if beam_index != self.calibration_beam:
             self.status_var.set(
                 f"Wrong beam — break Beam "
                 f"{self.calibration_beam + 1}"
             )
+
             return
 
-        self.calibration_passed[beam_index] = True
+        self.calibration_passed[
+            beam_index
+        ] = True
 
-        self.beam_buttons[beam_index].configure(
+        self.beam_buttons[
+            beam_index
+        ].configure(
             bg="#22c55e",
             activebackground="#16a34a",
-            text=f"Beam {beam_index + 1}\nPASSED"
+            text=(
+                f"Beam {beam_index + 1}\n"
+                f"PASSED"
+            )
         )
 
+        # Final beam.
         if self.calibration_beam == 7:
             self.status_var.set(
-                "Calibration complete — all 8 beams passed"
+                "Calibration complete — "
+                "all 8 beams passed"
             )
 
-            # Keep calibration active briefly so the final
-            # note-off does not erase the PASSED display.
+            # Keep final result visible for two seconds.
             self.root.after(
                 2000,
                 self.reset_after_calibration
             )
+
             return
 
         self.calibration_beam += 1
+
         self.highlight_calibration_beam()
 
         self.status_var.set(
             f"Beam {beam_index + 1} passed — "
-            f"break Beam {self.calibration_beam + 1}"
+            f"break Beam "
+            f"{self.calibration_beam + 1}"
         )
 
     def reset_after_calibration(self):
         self.calibration_active = False
         self.calibration_beam = 0
-        self.calibration_passed = [False] * 8
-        self.beam_states = [False] * 8
+
+        self.calibration_passed = [
+            False
+        ] * 8
+
+        self.beam_states = [
+            False
+        ] * 8
 
         for index in range(8):
             self.beam_buttons[index].configure(
                 bg="#1f2937",
                 activebackground="#2563eb",
-                text=f"Beam {index + 1}\n{self.notes[index]}"
+                text=(
+                    f"Beam {index + 1}\n"
+                    f"{self.get_beam_note_name(index)}"
+                )
             )
 
         self.status_var.set(
-            f"Ready — {self.instrument_var.get()}"
+            f"Ready — "
+            f"{self.instrument_var.get()} — "
+            f"Key {self.key_var.get()} — "
+            f"Octave {self.octave_text.get()}"
         )
 
+    # ============================================================
+    # WINDOW / EXIT
+    # ============================================================
+
     def exit_fullscreen(self, event=None):
-        self.root.attributes("-fullscreen", False)
+        self.root.attributes(
+            "-fullscreen",
+            False
+        )
 
     def close_program(self):
+        # Stop all notes first.
+        for index in range(8):
+            self.cancel_note_off_timer(
+                index
+            )
+
+            self.stop_output_note(
+                index
+            )
+
+        # MIDI panic in case anything remains sounding.
+        if self.midi_output is not None:
+            try:
+                self.midi_output.send(
+                    mido.Message(
+                        "control_change",
+                        channel=0,
+                        control=123,
+                        value=0
+                    )
+                )
+            except Exception:
+                pass
+
         try:
             if self.midi_input is not None:
                 self.midi_input.close()
