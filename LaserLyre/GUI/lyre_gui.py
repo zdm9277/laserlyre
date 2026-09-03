@@ -12,7 +12,8 @@ class LaserLyreGUI:
         # ------------------------------------------------------------
         self.root.title("Laser Lyre")
         self.root.configure(bg="#111827")
-        self.root.attributes("-fullscreen", True)
+        self.is_fullscreen = True
+        self.root.attributes("-fullscreen", self.is_fullscreen)
 
         # Keyboard/window controls.
         self.root.bind("<Escape>", self.exit_fullscreen_mode)
@@ -270,7 +271,9 @@ class LaserLyreGUI:
         )
 
         beam_button_frame.pack(
-            expand=True
+            fill='x',
+            expand=True,
+            padx=10
         )
 
         for beam_index in range(8):
@@ -309,14 +312,16 @@ class LaserLyreGUI:
             )
 
     def build_control_panel(self):
-        controls_frame = tk.Frame(
+        self.controls_frame = tk.Frame(
             self.root,
             bg="#1f2937"
         )
 
-        controls_frame.pack(
+        controls_frame = self.controls_frame
+
+        self.controls_frame.pack(
             fill="x",
-            padx=20,
+            padx=0,
             pady=(0, 20)
         )
 
@@ -1450,29 +1455,42 @@ class LaserLyreGUI:
     # ==============================================================
 
     def exit_fullscreen_mode(self, event=None):
+        self.is_fullscreen = False
+
         self.root.attributes(
             "-fullscreen",
             False
         )
 
+        self.root.update_idletasks()
         self.update_fullscreen_button_text()
 
     def toggle_fullscreen_mode(self, event=None):
-        fullscreen_is_enabled = bool(
-            self.root.attributes("-fullscreen")
-        )
+        self.is_fullscreen = not self.is_fullscreen
 
         self.root.attributes(
             "-fullscreen",
-            not fullscreen_is_enabled
+            self.is_fullscreen
         )
+
+        self.root.update_idletasks()
 
         # Give Tkinter time to apply the window state before updating
         # the button label.
         self.root.after(
-            50,
-            self.update_fullscreen_button_text
+            100,
+            self.refresh_window_layout
         )
+    def refresh_window_layout(self):
+        self.root.update_idletasks()
+
+        if hasattr(self, "controls_frame"):
+            self.controls_frame.destroy()
+
+        self.build_control_panel()
+
+        self.root.update_idletasks()
+        self.update_fullscreen_button_text()
 
     def update_fullscreen_button_text(self):
         if self.fullscreen_toggle_button is None:
