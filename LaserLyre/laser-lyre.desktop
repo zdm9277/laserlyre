@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Laser Lyre
+Comment=Launch the Laser Lyre
+Exec=/home/skynet/LaserLyre/startup.sh
+Icon=audio-x-generic
+Terminal=false
+Categories=Audio;Music;
