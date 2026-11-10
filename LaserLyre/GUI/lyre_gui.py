@@ -12,6 +12,16 @@ class LaserLyreGUI:
         # ------------------------------------------------------------
         self.root.title("Laser Lyre")
         self.root.configure(bg="#111827")
+
+        # Sized for an 800x480 touch screen.
+        self.root.geometry("800x480")
+        self.root.minsize(800, 480)
+
+        # Larger dropdown list text so options are easy to tap.
+        self.root.option_add(
+            "*TCombobox*Listbox.font",
+            ("Arial", 15)
+        )
         self.is_fullscreen = True
         self.root.attributes("-fullscreen", self.is_fullscreen)
 
@@ -124,6 +134,10 @@ class LaserLyreGUI:
             value=80
         )
 
+        self.volume_display_text = tk.StringVar(
+            value="80%"
+        )
+
         self.selected_key = tk.StringVar(
             value="C"
         )
@@ -154,10 +168,12 @@ class LaserLyreGUI:
         # ------------------------------------------------------------
         # Build the GUI
         # ------------------------------------------------------------
+        # Bottom-anchored parts are packed first so the beam section
+        # fills whatever height remains.
         self.build_header()
-        self.build_beam_section()
-        self.build_control_panel()
         self.build_status_bar()
+        self.build_control_panel()
+        self.build_beam_section()
 
         # ------------------------------------------------------------
         # Connect MIDI
@@ -178,8 +194,7 @@ class LaserLyreGUI:
     def build_header(self):
         header_frame = tk.Frame(
             self.root,
-            bg="#0f172a",
-            height=80
+            bg="#0f172a"
         )
 
         header_frame.pack(
@@ -189,53 +204,74 @@ class LaserLyreGUI:
         title_label = tk.Label(
             header_frame,
             text="LASER LYRE",
-            font=("Arial", 28, "bold"),
+            font=("Arial", 18, "bold"),
             fg="white",
             bg="#0f172a"
         )
 
         title_label.pack(
             side="left",
-            padx=25,
-            pady=18
+            padx=12,
+            pady=6
         )
 
         # Exit button stays on the far-right side.
         exit_button = tk.Button(
             header_frame,
             text="Exit",
-            font=("Arial", 14, "bold"),
+            font=("Arial", 12, "bold"),
             bg="#dc2626",
             fg="white",
             activebackground="#b91c1c",
             activeforeground="white",
             command=self.close_application,
-            width=10
+            width=6
         )
 
         exit_button.pack(
             side="right",
-            padx=(10, 25),
-            pady=18
+            padx=(6, 12),
+            pady=6,
+            ipady=4
         )
 
         # Fullscreen / Restore button appears beside Exit.
         self.fullscreen_toggle_button = tk.Button(
             header_frame,
             text="Restore",
-            font=("Arial", 14, "bold"),
+            font=("Arial", 12, "bold"),
             bg="#2563eb",
             fg="white",
             activebackground="#1d4ed8",
             activeforeground="white",
             command=self.toggle_fullscreen_mode,
-            width=12
+            width=9
         )
 
         self.fullscreen_toggle_button.pack(
             side="right",
-            padx=(10, 0),
-            pady=18
+            padx=(6, 0),
+            pady=6,
+            ipady=4
+        )
+
+        calibration_button = tk.Button(
+            header_frame,
+            text="Calibrate",
+            font=("Arial", 12, "bold"),
+            bg="#f59e0b",
+            fg="black",
+            activebackground="#d97706",
+            activeforeground="black",
+            command=self.start_beam_calibration,
+            width=9
+        )
+
+        calibration_button.pack(
+            side="right",
+            padx=(6, 0),
+            pady=6,
+            ipady=4
         )
 
         self.update_fullscreen_button_text()
@@ -249,20 +285,20 @@ class LaserLyreGUI:
         beam_section_frame.pack(
             fill="both",
             expand=True,
-            padx=20,
-            pady=20
+            padx=8,
+            pady=(6, 6)
         )
 
         beam_section_title = tk.Label(
             beam_section_frame,
             text="Laser Strings",
-            font=("Arial", 20, "bold"),
+            font=("Arial", 13, "bold"),
             fg="white",
             bg="#111827"
         )
 
         beam_section_title.pack(
-            pady=(0, 15)
+            pady=(0, 4)
         )
 
         beam_button_frame = tk.Frame(
@@ -270,22 +306,25 @@ class LaserLyreGUI:
             bg="#111827"
         )
 
+        # Centered vertically; buttons stretch across but keep a
+        # fixed height so they stay roughly square.
         beam_button_frame.pack(
-            fill='x',
-            expand=True,
-            padx=10
+            fill="x",
+            expand=True
         )
 
         for beam_index in range(8):
+            # Width of 1 lets the grid give each button an equal share
+            # of the row width.
             beam_button = tk.Button(
                 beam_button_frame,
                 text=(
                     f"Beam {beam_index + 1}\n"
                     f"{self.get_beam_display_note_name(beam_index)}"
                 ),
-                width=8,
-                height=5,
-                font=("Arial", 14, "bold"),
+                width=1,
+                height=4,
+                font=("Arial", 13, "bold"),
                 bg="#1f2937",
                 fg="white",
                 activebackground="#2563eb",
@@ -297,8 +336,8 @@ class LaserLyreGUI:
             beam_button.grid(
                 row=0,
                 column=beam_index,
-                padx=5,
-                pady=5,
+                padx=3,
+                pady=3,
                 sticky="nsew"
             )
 
@@ -308,7 +347,8 @@ class LaserLyreGUI:
 
             beam_button_frame.grid_columnconfigure(
                 beam_index,
-                weight=1
+                weight=1,
+                uniform="beam"
             )
 
     def build_control_panel(self):
@@ -317,22 +357,35 @@ class LaserLyreGUI:
             bg="#1f2937"
         )
 
-        controls_frame = self.controls_frame
-
+        # Packed at the bottom (above the status bar) so it keeps its
+        # place when rebuilt after a fullscreen toggle.
         self.controls_frame.pack(
             fill="x",
-            padx=0,
-            pady=(0, 20)
+            side="bottom"
         )
 
+        label_font = ("Arial", 12, "bold")
+        value_font = ("Arial", 12, "bold")
+
         # ----------------------------------------------------------
-        # Instrument
+        # Row 1: instrument, key, octave
         # ----------------------------------------------------------
 
+        top_row_frame = tk.Frame(
+            self.controls_frame,
+            bg="#1f2937"
+        )
+
+        top_row_frame.pack(
+            fill="x",
+            padx=8,
+            pady=(6, 2)
+        )
+
         instrument_label = tk.Label(
-            controls_frame,
+            top_row_frame,
             text="Instrument:",
-            font=("Arial", 15, "bold"),
+            font=label_font,
             fg="white",
             bg="#1f2937"
         )
@@ -340,26 +393,25 @@ class LaserLyreGUI:
         instrument_label.grid(
             row=0,
             column=0,
-            padx=(15, 5),
-            pady=18
+            padx=(0, 4)
         )
 
         instrument_menu = ttk.Combobox(
-            controls_frame,
+            top_row_frame,
             textvariable=self.selected_instrument,
             values=list(
                 self.instrument_program_numbers.keys()
             ),
             state="readonly",
-            font=("Arial", 14),
-            width=17
+            font=("Arial", 13),
+            width=14
         )
 
         instrument_menu.grid(
             row=0,
             column=1,
-            padx=5,
-            pady=18
+            padx=(0, 4),
+            ipady=6
         )
 
         instrument_menu.bind(
@@ -367,82 +419,36 @@ class LaserLyreGUI:
             self.handle_instrument_selection_changed
         )
 
-        # ----------------------------------------------------------
-        # Volume
-        # ----------------------------------------------------------
-
-        volume_label = tk.Label(
-            controls_frame,
-            text="Volume:",
-            font=("Arial", 15, "bold"),
-            fg="white",
-            bg="#1f2937"
-        )
-
-        volume_label.grid(
-            row=0,
-            column=2,
-            padx=(20, 5),
-            pady=18
-        )
-
-        volume_slider = tk.Scale(
-            controls_frame,
-            from_=0,
-            to=100,
-            orient="horizontal",
-            variable=self.volume_percent,
-            command=self.handle_volume_slider_changed,
-            length=200,
-            font=("Arial", 12),
-            bg="#1f2937",
-            fg="white",
-            troughcolor="#374151",
-            highlightthickness=0
-        )
-
-        volume_slider.grid(
-            row=0,
-            column=3,
-            padx=5,
-            pady=8
-        )
-
-        # ----------------------------------------------------------
-        # Key
-        # ----------------------------------------------------------
-
         key_label = tk.Label(
-            controls_frame,
+            top_row_frame,
             text="Key:",
-            font=("Arial", 15, "bold"),
+            font=label_font,
             fg="white",
             bg="#1f2937"
         )
 
         key_label.grid(
             row=0,
-            column=4,
-            padx=(20, 5),
-            pady=18
+            column=3,
+            padx=(4, 4)
         )
 
         key_menu = ttk.Combobox(
-            controls_frame,
+            top_row_frame,
             textvariable=self.selected_key,
             values=list(
                 self.key_semitone_offsets.keys()
             ),
             state="readonly",
-            font=("Arial", 14),
-            width=4
+            font=("Arial", 13),
+            width=3
         )
 
         key_menu.grid(
             row=0,
-            column=5,
-            padx=5,
-            pady=18
+            column=4,
+            padx=(0, 4),
+            ipady=6
         )
 
         key_menu.bind(
@@ -450,14 +456,10 @@ class LaserLyreGUI:
             self.handle_key_selection_changed
         )
 
-        # ----------------------------------------------------------
-        # Octave
-        # ----------------------------------------------------------
-
         octave_label = tk.Label(
-            controls_frame,
+            top_row_frame,
             text="Octave:",
-            font=("Arial", 15, "bold"),
+            font=label_font,
             fg="white",
             bg="#1f2937"
         )
@@ -465,12 +467,11 @@ class LaserLyreGUI:
         octave_label.grid(
             row=0,
             column=6,
-            padx=(20, 5),
-            pady=18
+            padx=(4, 4)
         )
 
         octave_down_button = tk.Button(
-            controls_frame,
+            top_row_frame,
             text="-",
             font=("Arial", 14, "bold"),
             command=self.decrease_octave_shift,
@@ -480,14 +481,13 @@ class LaserLyreGUI:
         octave_down_button.grid(
             row=0,
             column=7,
-            padx=4,
-            pady=18
+            padx=2
         )
 
         octave_value_label = tk.Label(
-            controls_frame,
+            top_row_frame,
             textvariable=self.octave_display_text,
-            font=("Arial", 15, "bold"),
+            font=value_font,
             fg="white",
             bg="#1f2937",
             width=3
@@ -496,12 +496,11 @@ class LaserLyreGUI:
         octave_value_label.grid(
             row=0,
             column=8,
-            padx=2,
-            pady=18
+            padx=2
         )
 
         octave_up_button = tk.Button(
-            controls_frame,
+            top_row_frame,
             text="+",
             font=("Arial", 14, "bold"),
             command=self.increase_octave_shift,
@@ -511,97 +510,144 @@ class LaserLyreGUI:
         octave_up_button.grid(
             row=0,
             column=9,
-            padx=4,
-            pady=18
+            padx=2
+        )
+
+        # Empty spacer columns spread the groups across the row.
+        top_row_frame.grid_columnconfigure(
+            2,
+            weight=1
+        )
+
+        top_row_frame.grid_columnconfigure(
+            5,
+            weight=1
         )
 
         # ----------------------------------------------------------
-        # Calibration
+        # Row 2: volume, note duration
         # ----------------------------------------------------------
 
-        calibration_button = tk.Button(
-            controls_frame,
-            text="Calibrate",
-            font=("Arial", 14, "bold"),
-            bg="#f59e0b",
-            fg="black",
-            activebackground="#d97706",
-            activeforeground="black",
-            command=self.start_beam_calibration,
-            width=11
+        bottom_row_frame = tk.Frame(
+            self.controls_frame,
+            bg="#1f2937"
         )
 
-        calibration_button.grid(
+        bottom_row_frame.pack(
+            fill="x",
+            padx=8,
+            pady=(2, 6)
+        )
+
+        slider_options = {
+            "orient": "horizontal",
+            "length": 120,
+            "width": 22,
+            "sliderlength": 36,
+            "bg": "#1f2937",
+            "fg": "white",
+            "troughcolor": "#374151",
+            "highlightthickness": 0,
+            "showvalue": False,
+        }
+
+        volume_label = tk.Label(
+            bottom_row_frame,
+            text="Volume:",
+            font=label_font,
+            fg="white",
+            bg="#1f2937"
+        )
+
+        volume_label.grid(
             row=0,
-            column=10,
-            padx=20,
-            pady=18
+            column=0,
+            padx=(0, 4)
         )
 
-        # ----------------------------------------------------------
-        # Note duration
-        # ----------------------------------------------------------
+        volume_slider = tk.Scale(
+            bottom_row_frame,
+            from_=0,
+            to=100,
+            variable=self.volume_percent,
+            command=self.handle_volume_slider_changed,
+            **slider_options
+        )
+
+        volume_slider.grid(
+            row=0,
+            column=1,
+            padx=4,
+            sticky="ew"
+        )
+
+        volume_value_label = tk.Label(
+            bottom_row_frame,
+            textvariable=self.volume_display_text,
+            font=value_font,
+            fg="#86efac",
+            bg="#1f2937",
+            width=4
+        )
+
+        volume_value_label.grid(
+            row=0,
+            column=2,
+            padx=(0, 8)
+        )
 
         note_duration_label = tk.Label(
-            controls_frame,
-            text="Note Duration:",
-            font=("Arial", 15, "bold"),
+            bottom_row_frame,
+            text="Duration:",
+            font=label_font,
             fg="white",
             bg="#1f2937"
         )
 
         note_duration_label.grid(
-            row=1,
-            column=0,
-            padx=15,
-            pady=(0, 12)
+            row=0,
+            column=3,
+            padx=(8, 4)
         )
 
         note_duration_slider = tk.Scale(
-            controls_frame,
+            bottom_row_frame,
             from_=0.25,
             to=5.0,
             resolution=0.25,
-            orient="horizontal",
             variable=self.note_duration_seconds,
             command=self.handle_note_duration_slider_changed,
-            length=500,
-            font=("Arial", 12),
-            bg="#1f2937",
-            fg="white",
-            troughcolor="#374151",
-            highlightthickness=0,
-            showvalue=False
+            **slider_options
         )
 
         note_duration_slider.grid(
-            row=1,
-            column=1,
-            columnspan=7,
-            padx=10,
-            pady=(0, 12),
+            row=0,
+            column=4,
+            padx=4,
             sticky="ew"
         )
 
         note_duration_value_label = tk.Label(
-            controls_frame,
+            bottom_row_frame,
             textvariable=self.note_duration_display_text,
-            font=("Arial", 15, "bold"),
+            font=value_font,
             fg="#86efac",
             bg="#1f2937",
-            width=7
+            width=6
         )
 
         note_duration_value_label.grid(
-            row=1,
-            column=8,
-            columnspan=2,
-            padx=10,
-            pady=(0, 12)
+            row=0,
+            column=5
         )
 
-        controls_frame.grid_columnconfigure(
-            3,
+        bottom_row_frame.grid_columnconfigure(
+            1,
+            weight=1
+        )
+
+        bottom_row_frame.grid_columnconfigure(
+            4,
             weight=1
         )
 
@@ -610,11 +656,11 @@ class LaserLyreGUI:
             self.root,
             textvariable=self.status_message,
             anchor="w",
-            font=("Arial", 13),
+            font=("Arial", 11),
             fg="#86efac",
             bg="#0f172a",
-            padx=20,
-            pady=10
+            padx=12,
+            pady=4
         )
 
         status_bar.pack(
@@ -1256,6 +1302,10 @@ class LaserLyreGUI:
     def handle_volume_slider_changed(self, slider_value):
         volume_percent = int(
             float(slider_value)
+        )
+
+        self.volume_display_text.set(
+            f"{volume_percent}%"
         )
 
         if self.fluidsynth_midi_output is None:
