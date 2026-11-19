@@ -130,14 +130,6 @@ class LaserLyreGUI:
             value="Grand Piano"
         )
 
-        self.volume_percent = tk.IntVar(
-            value=80
-        )
-
-        self.volume_display_text = tk.StringVar(
-            value="80%"
-        )
-
         self.selected_key = tk.StringVar(
             value="C"
         )
@@ -525,7 +517,7 @@ class LaserLyreGUI:
         )
 
         # ----------------------------------------------------------
-        # Row 2: volume, note duration
+        # Row 2: note duration
         # ----------------------------------------------------------
 
         bottom_row_frame = tk.Frame(
@@ -551,51 +543,6 @@ class LaserLyreGUI:
             "showvalue": False,
         }
 
-        volume_label = tk.Label(
-            bottom_row_frame,
-            text="Volume:",
-            font=label_font,
-            fg="white",
-            bg="#1f2937"
-        )
-
-        volume_label.grid(
-            row=0,
-            column=0,
-            padx=(0, 4)
-        )
-
-        volume_slider = tk.Scale(
-            bottom_row_frame,
-            from_=0,
-            to=100,
-            variable=self.volume_percent,
-            command=self.handle_volume_slider_changed,
-            **slider_options
-        )
-
-        volume_slider.grid(
-            row=0,
-            column=1,
-            padx=4,
-            sticky="ew"
-        )
-
-        volume_value_label = tk.Label(
-            bottom_row_frame,
-            textvariable=self.volume_display_text,
-            font=value_font,
-            fg="#86efac",
-            bg="#1f2937",
-            width=4
-        )
-
-        volume_value_label.grid(
-            row=0,
-            column=2,
-            padx=(0, 8)
-        )
-
         note_duration_label = tk.Label(
             bottom_row_frame,
             text="Duration:",
@@ -606,8 +553,8 @@ class LaserLyreGUI:
 
         note_duration_label.grid(
             row=0,
-            column=3,
-            padx=(8, 4)
+            column=0,
+            padx=(0, 4)
         )
 
         note_duration_slider = tk.Scale(
@@ -622,7 +569,7 @@ class LaserLyreGUI:
 
         note_duration_slider.grid(
             row=0,
-            column=4,
+            column=1,
             padx=4,
             sticky="ew"
         )
@@ -638,7 +585,7 @@ class LaserLyreGUI:
 
         note_duration_value_label.grid(
             row=0,
-            column=5
+            column=2
         )
 
         bottom_row_frame.grid_columnconfigure(
@@ -646,10 +593,6 @@ class LaserLyreGUI:
             weight=1
         )
 
-        bottom_row_frame.grid_columnconfigure(
-            4,
-            weight=1
-        )
 
     def build_status_bar(self):
         status_bar = tk.Label(
@@ -750,10 +693,6 @@ class LaserLyreGUI:
             )
 
             self.send_selected_instrument_program_change()
-
-            self.handle_volume_slider_changed(
-                self.volume_percent.get()
-            )
 
             self.status_message.set(
                 f"Ready — "
@@ -1293,47 +1232,6 @@ class LaserLyreGUI:
         except Exception as error:
             self.status_message.set(
                 f"Instrument change failed: {error}"
-            )
-
-    # ==============================================================
-    # VOLUME CONTROL
-    # ==============================================================
-
-    def handle_volume_slider_changed(self, slider_value):
-        volume_percent = int(
-            float(slider_value)
-        )
-
-        self.volume_display_text.set(
-            f"{volume_percent}%"
-        )
-
-        if self.fluidsynth_midi_output is None:
-            return
-
-        # Convert 0-100 GUI volume into MIDI's 0-127 range.
-        midi_volume = int(
-            (volume_percent / 100)
-            * 127
-        )
-
-        try:
-            self.fluidsynth_midi_output.send(
-                mido.Message(
-                    "control_change",
-                    channel=0,
-                    control=7,
-                    value=midi_volume
-                )
-            )
-
-            self.status_message.set(
-                f"Volume: {volume_percent}%"
-            )
-
-        except Exception as error:
-            self.status_message.set(
-                f"Volume change failed: {error}"
             )
 
     # ==============================================================
